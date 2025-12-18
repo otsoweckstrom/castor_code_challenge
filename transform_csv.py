@@ -55,17 +55,32 @@ class CSVTransformer:
     Maintains state for UUID mappings to ensure consistency across transformations.
     """
 
-    def __init__(self):
+    def __init__(self, ollama_model='gemma3:1b', verbose=False):
         """Initialize the transformer with empty UUID mapping."""
         self.uuid_to_int_map = {}
         self.next_id = 1
         self.use_ollama = OLLAMA_AVAILABLE
+        self.ollama_model = ollama_model
+        self.verbose = verbose
 
         if self.use_ollama:
             try:
-                ollama.list()
-            except Exception:
+                models_response = ollama.list()
+                available_models = [m.model for m in models_response.models]
+                if self.ollama_model not in available_models:
+                    print(f"Warning: Model '{self.ollama_model}' not found. Available models: {available_models}")
+                    print(f"Falling back to random generation.")
+                    self.use_ollama = False
+            except Exception as e:
+                print(f"Warning: Could not connect to Ollama: {e}")
+                print(f"Falling back to random generation.")
                 self.use_ollama = False
+
+        if self.use_ollama:
+            print(f"Using Ollama model: {self.ollama_model}")
+
+        if self.verbose:
+            print(f"Verbose mode: {'ON' if self.use_ollama else 'OFF (using fallback random generation)'}")
 
     def uuid_to_sequential_int(self, uuid_string):
         """
@@ -84,29 +99,45 @@ class CSVTransformer:
         self.next_id += 1
         return self.uuid_to_int_map[uuid_string]
 
-    def _generate_with_ollama(self, prompt, fallback_func):
+    def _generate_with_ollama(self, prompt, fallback_func, data_type="data"):
         """
         Try to generate redacted data using Ollama, fallback to random if unavailable.
 
         Args:
             prompt: Prompt to send to Ollama
             fallback_func: Function to call if Ollama is unavailable or fails
+            data_type: Type of data being generated (for verbose output)
 
         Returns:
             str: Generated fake data
         """
         if not self.use_ollama:
+            if self.verbose:
+                print(f"  [Fallback] Generating random {data_type}...")
             return fallback_func()
 
         try:
-            response = ollama.generate(model='llama3.2', prompt=prompt)
-            result = response['response'].strip()
-            if result:
-                return result
-        except Exception:
-            pass
+            if self.verbose:
+                print(f"  [Ollama] Generating {data_type}...", end=" ")
 
-        return fallback_func()
+            response = ollama.generate(model=self.ollama_model, prompt=prompt)
+            result = response['response'].strip()
+
+            if result:
+                if self.verbose:
+                    print(f"[OK] Generated: {result}")
+                return result
+        except Exception as e:
+            if self.verbose:
+                print(f"[FAIL] {e}")
+            else:
+                print(f"Warning: Ollama generation failed: {e}")
+                print(f"Falling back to random generation for this field.")
+
+        result = fallback_func()
+        if self.verbose:
+            print(f"  [Fallback] Using random: {result}")
+        return result
 
     def redact_name(self, name):
         """
@@ -125,7 +156,7 @@ class CSVTransformer:
             return f"{first_name} {last_name}"
 
         prompt = "Generate a random realistic full name (first and last name). Output only the name, nothing else."
-        return self._generate_with_ollama(prompt, random_name)
+        return self._generate_with_ollama(prompt, random_name, data_type="name")
 
     def redact_email(self, email):
         """
@@ -145,7 +176,7 @@ class CSVTransformer:
             return f"{local_part}@{domain}"
 
         prompt = "Generate a random fake email address. Output only the email address, nothing else."
-        return self._generate_with_ollama(prompt, random_email)
+        return self._generate_with_ollama(prompt, random_email, data_type="email")
 
     def timestamp_to_date(self, timestamp_string):
         """
@@ -281,6 +312,17 @@ def interactive_mode(input_file, transformer):
     os.system('clear' if os.name == 'posix' else 'cls')
     print("CSV Transformer\n")
 
+    # Show ollama status after screen clear
+    if transformer.use_ollama:
+        print(f"[Ollama] Using model: {transformer.ollama_model}")
+        if transformer.verbose:
+            print("[Verbose] ON - will show generation details\n")
+    else:
+        print("[Ollama] NOT available - using random generation")
+        if transformer.verbose:
+            print("[Verbose] ON\n")
+    print()
+
     with open(input_file, 'r') as f:
         reader = csv.DictReader(f)
         columns = list(reader.fieldnames)
@@ -335,15 +377,20 @@ def main():
         epilog="""
 Example:
   python transform_csv.py --input user_sample.csv --output output.csv
+  python transform_csv.py --input user_sample.csv --output output.csv --ollama-model gemma3:latest
         """
     )
 
     parser.add_argument('-i', '--input', required=True, help='Input CSV file path')
     parser.add_argument('-o', '--output', required=True, help='Output CSV file path')
+    parser.add_argument('--ollama-model', default='gemma3:1b',
+                       help='Ollama model to use for generating redactions (default: gemma3:1b)')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                       help='Show detailed output for each Ollama generation')
 
     args = parser.parse_args()
 
-    transformer = CSVTransformer()
+    transformer = CSVTransformer(ollama_model=args.ollama_model, verbose=args.verbose)
     transformations, column_order = interactive_mode(args.input, transformer)
 
     transformer.transform_csv(args.input, args.output, transformations=transformations, column_order=column_order)

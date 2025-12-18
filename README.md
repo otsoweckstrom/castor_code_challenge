@@ -11,13 +11,20 @@ A command-line tool for transforming CSV files with configurable column transfor
 
 No installation required. The tool uses only Python standard library for core functionality.
 
-**Optional AI Enhancement:**
-For AI-powered redaction using Ollama, install:
+**Optional: Ollama Integration (Educational Example)**
+
+This tool includes optional integration with Ollama for AI-powered data redaction:
 ```bash
 pip install ollama
 ```
 
-The tool automatically detects if Ollama is available and uses it for generating more realistic fake names and emails. If Ollama is not installed or not running, it falls back to random generation.
+**Note:** The Ollama integration provides **no significant practical value** for this use case - random generation works just as well for creating fake names and emails. However, it serves as a **working example of data-secure LLM usage** with local models, demonstrating how to:
+- Keep sensitive data on-premises using local AI models
+- Integrate LLM generation into data transformation pipelines
+- Implement graceful fallbacks when AI services are unavailable
+- Configure and switch between different local models
+
+The tool automatically detects if Ollama is available and uses it for generating fake data. If Ollama is not installed or not running, it falls back to random generation.
 
 ## Usage
 
@@ -28,6 +35,27 @@ python3 transform_csv.py --input user_sample.csv --output my_output.csv
 ```
 
 The tool will prompt you to configure transformations for each column.
+
+### Command-Line Options
+
+```bash
+python3 transform_csv.py -i INPUT -o OUTPUT [--ollama-model MODEL] [-v]
+```
+
+**Options:**
+- `-i, --input` - Input CSV file path (required)
+- `-o, --output` - Output CSV file path (required)
+- `--ollama-model` - Ollama model to use (default: `gemma3:1b`). Use `ollama list` to see available models.
+- `-v, --verbose` - Show detailed output for each generation, displaying whether Ollama or fallback is used
+
+**Example with Ollama options:**
+```bash
+# Use verbose mode to see Ollama in action
+python3 transform_csv.py -i user_sample.csv -o output.csv -v
+
+# Use a different model
+python3 transform_csv.py -i user_sample.csv -o output.csv --ollama-model gemma3:latest -v
+```
 
 ### Interactive Prompts
 
@@ -45,6 +73,9 @@ The tool will prompt you to configure transformations for each column.
 ```
 CSV Transformer
 
+[Ollama] Using model: gemma3:1b
+[Verbose] ON - will show generation details
+
 Detected columns: user_id, manager_id, name, email_address, start_date, last_login
 
 Available transformations:
@@ -61,6 +92,10 @@ Transform 'start_date' with (0-3): 3
 Transform 'last_login' with (0-3): 3
 
 Reorder columns? (y/n): n
+
+  [Ollama] Generating name... [OK] Generated: Robert James Miller
+  [Ollama] Generating email... [OK] Generated: john.doe@example.com
+  ...
 
 Output saved to: my_output.csv
 ```
@@ -80,17 +115,24 @@ EFEABEA5-981B-4E45-8F13-425C456BF7F6 → 1 /same UUID, same integer
 ### Redaction (`redact`)
 Replaces sensitive data with fake data. Auto-detects whether the value is a name or email.
 
-If Ollama is available, uses AI to generate realistic fake data. Otherwise, falls back to random generation.
+If Ollama is available with a compatible model, uses local AI to generate fake data. Otherwise, falls back to random generation. Both methods produce equally valid results for data redaction purposes.
+
+**Verbose Output:**
+Use the `-v` flag to see which method is being used for each generation:
+```
+  [Ollama] Generating name... [OK] Generated: Robert James Miller
+  [Ollama] Generating email... [OK] Generated: john.doe@example.com
+```
 
 **Names:** Generates random first and last name combinations.
 ```
-John Doe → Patricia Smith (random) or Sarah Johnson (AI-generated)
-Jane Smith → Michael Rodriguez (random) or David Chen (AI-generated)
+John Doe → Patricia Smith (random) or Sarah Johnson (Ollama)
+Jane Smith → Michael Rodriguez (random) or David Chen (Ollama)
 ```
 
 **Emails:** Generates random fake email addresses.
 ```
-user@example.com → xhjtklm@test.com (random) or jane.smith@email.com (AI-generated)
+user@example.com → xhjtklm@test.com (random) or jane.smith@email.com (Ollama)
 ```
 
 ### Timestamp to Date (`timestamp_to_date`)
@@ -135,10 +177,15 @@ The tool uses a class-based architecture with the `CSVTransformer` class that in
 - `redact(value)` - Auto-detecting redaction wrapper
 - `redact_name(name)` - Name redaction
 - `redact_email(email)` - Email redaction
+- `_generate_with_ollama(prompt, fallback_func, data_type)` - Ollama integration with fallback
 - `timestamp_to_date(timestamp_string)` - Timestamp parser
 - `apply_transformation(value, transformation_type)` - Transformation dispatcher
 - `transform_csv(input_file, output_file, transformations, column_order)` - Main transformation pipeline
 - `get_transformations()` - Returns available transformations registry
+
+**Configuration Parameters:**
+- `ollama_model` - Specifies which Ollama model to use (default: `gemma3:1b`)
+- `verbose` - Enables detailed output showing generation method for each field
 
 ### Design Pattern
 
