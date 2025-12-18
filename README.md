@@ -190,3 +190,6 @@ Output (my_output.csv):
 user_id,manager_id,name,email_address,start_date,last_login
 1,2,Patricia Smith,xhjtklm@test.com,2025-03-01,2025-03-23
 ```
+
+## AI Disclosure
+Claude Code was used in the development as a planning tool as well as helping to format the documentation.
