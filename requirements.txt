@@ -1,0 +1,6 @@
+# No external dependencies required for core functionality
+# All transformations use Python standard library
+
+# Development dependencies (optional)
+pytest>=7.4.0
+pytest-cov>=4.1.0
