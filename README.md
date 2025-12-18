@@ -1,8 +1,5 @@
 # CSV Transformer
 
-**Author:** Otso Weckstrom
-**Date:** December 2025
-
 A command-line tool for transforming CSV files with configurable column transformations.
 
 ## Requirements
