@@ -12,6 +12,12 @@ import argparse
 import os
 from datetime import datetime
 
+try:
+    import ollama
+    OLLAMA_AVAILABLE = True
+except ImportError:
+    OLLAMA_AVAILABLE = False
+
 
 # Pool of names and domains for generating redactions for the dataset
 FIRST_NAMES = [
@@ -53,6 +59,13 @@ class CSVTransformer:
         """Initialize the transformer with empty UUID mapping."""
         self.uuid_to_int_map = {}
         self.next_id = 1
+        self.use_ollama = OLLAMA_AVAILABLE
+
+        if self.use_ollama:
+            try:
+                ollama.list()
+            except Exception:
+                self.use_ollama = False
 
     def uuid_to_sequential_int(self, uuid_string):
         """
@@ -71,9 +84,34 @@ class CSVTransformer:
         self.next_id += 1
         return self.uuid_to_int_map[uuid_string]
 
+    def _generate_with_ollama(self, prompt, fallback_func):
+        """
+        Try to generate redacted data using Ollama, fallback to random if unavailable.
+
+        Args:
+            prompt: Prompt to send to Ollama
+            fallback_func: Function to call if Ollama is unavailable or fails
+
+        Returns:
+            str: Generated fake data
+        """
+        if not self.use_ollama:
+            return fallback_func()
+
+        try:
+            response = ollama.generate(model='llama3.2', prompt=prompt)
+            result = response['response'].strip()
+            if result:
+                return result
+        except Exception:
+            pass
+
+        return fallback_func()
+
     def redact_name(self, name):
         """
         Redact a person's name by generating a random fake name.
+        Uses Ollama if available, otherwise falls back to random selection.
 
         Args:
             name: The original name
@@ -81,13 +119,18 @@ class CSVTransformer:
         Returns:
             str: Random fake name (First Last format)
         """
-        first_name = random.choice(FIRST_NAMES)
-        last_name = random.choice(LAST_NAMES)
-        return f"{first_name} {last_name}"
+        def random_name():
+            first_name = random.choice(FIRST_NAMES)
+            last_name = random.choice(LAST_NAMES)
+            return f"{first_name} {last_name}"
+
+        prompt = "Generate a random realistic full name (first and last name). Output only the name, nothing else."
+        return self._generate_with_ollama(prompt, random_name)
 
     def redact_email(self, email):
         """
         Redact an email address by generating a random fake email.
+        Uses Ollama if available, otherwise falls back to random generation.
 
         Args:
             email: The original email
@@ -95,10 +138,14 @@ class CSVTransformer:
         Returns:
             str: Random fake email address
         """
-        local_length = random.randint(5, 10)
-        local_part = ''.join(random.choices(string.ascii_lowercase, k=local_length))
-        domain = random.choice(EMAIL_DOMAINS)
-        return f"{local_part}@{domain}"
+        def random_email():
+            local_length = random.randint(5, 10)
+            local_part = ''.join(random.choices(string.ascii_lowercase, k=local_length))
+            domain = random.choice(EMAIL_DOMAINS)
+            return f"{local_part}@{domain}"
+
+        prompt = "Generate a random fake email address. Output only the email address, nothing else."
+        return self._generate_with_ollama(prompt, random_email)
 
     def timestamp_to_date(self, timestamp_string):
         """

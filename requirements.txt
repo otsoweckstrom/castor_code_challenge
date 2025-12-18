@@ -4,3 +4,6 @@
 # Development dependencies (optional)
 pytest>=7.4.0
 pytest-cov>=4.1.0
+
+# Optional AI-powered redaction (optional)
+ollama>=0.1.0

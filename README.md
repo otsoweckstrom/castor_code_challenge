@@ -11,6 +11,14 @@ A command-line tool for transforming CSV files with configurable column transfor
 
 No installation required. The tool uses only Python standard library for core functionality.
 
+**Optional AI Enhancement:**
+For AI-powered redaction using Ollama, install:
+```bash
+pip install ollama
+```
+
+The tool automatically detects if Ollama is available and uses it for generating more realistic fake names and emails. If Ollama is not installed or not running, it falls back to random generation.
+
 ## Usage
 
 Run the tool with input and output file paths:
@@ -70,18 +78,19 @@ EFEABEA5-981B-4E45-8F13-425C456BF7F6 → 1 /same UUID, same integer
 ```
 
 ### Redaction (`redact`)
-Replaces sensitive data with random fake data. Auto-detects whether the value is a name or email.
+Replaces sensitive data with fake data. Auto-detects whether the value is a name or email.
 
-**Names:** Generates random first and last name combinations from predefined pools.
+If Ollama is available, uses AI to generate realistic fake data. Otherwise, falls back to random generation.
+
+**Names:** Generates random first and last name combinations.
 ```
-John Doe → Patricia Smith
-Jane Smith → Michael Rodriguez
+John Doe → Patricia Smith (random) or Sarah Johnson (AI-generated)
+Jane Smith → Michael Rodriguez (random) or David Chen (AI-generated)
 ```
 
-**Emails:** Generates random lowercase letter strings with random domains.
+**Emails:** Generates random fake email addresses.
 ```
-user@example.com → xhjtklm@test.com
-admin@company.com → pqwertyx@sample.org
+user@example.com → xhjtklm@test.com (random) or jane.smith@email.com (AI-generated)
 ```
 
 ### Timestamp to Date (`timestamp_to_date`)
